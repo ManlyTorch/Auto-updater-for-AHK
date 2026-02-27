@@ -15,9 +15,9 @@ class AutoUpdater {
         this._CheckForCommitUpdates()
     }
     
-    _HttpGet(url, *) {
+    _HttpGet(url) {
         http := ComObject("WinHttp.WinHttpRequest.5.1")
-        http.Open("GET", this.commitsURL, false, *)
+        http.Open("GET", this.commitsURL, false)
         http.SetRequestHeader("User-Agent", "AutoUpdate AHK")
         http.Send()
         http.WaitForResponse()
