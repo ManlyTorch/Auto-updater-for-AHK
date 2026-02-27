@@ -3,21 +3,25 @@
 
 github := "https://api.github.com/repos"
 class AutoUpdater {
+    newVersion := false
+
     __New(owner, repo, tree:="main", savePath:="version") {
         this.APIRepoURL := github "/" owner "/" repo
-        this.commitsURL := this.APIRepoURL "/commits?sha=" tree "?per_page=10"
-        this.commitURL := this.APIRepoURL "/commit/"
-        this.fileURL := this.APIRepoURL "/" tree "/"
+        this.commitsURL := this.APIRepoURL "/commits?per_page=10?sha=" tree
+        this.commitURL := this.APIRepoURL "/commits/"
+        this.fileURL := "https://raw.githubusercontent.com/" owner "/" repo "/" tree "/"
         this.updatedFiles := Map()
         this.savePath := savePath ".txt"
         this.CommitString := ""
+        this.currentCommit := ""
 
+        this._GetCommitVersion()
         this._CheckForCommitUpdates()
     }
     
     _HttpGet(url) {
         http := ComObject("WinHttp.WinHttpRequest.5.1")
-        http.Open("GET", this.commitsURL, false)
+        http.Open("GET", url, false)
         http.SetRequestHeader("User-Agent", "AutoUpdate AHK")
         http.Send()
         http.WaitForResponse()
@@ -31,17 +35,22 @@ class AutoUpdater {
 
     _CheckCommit(commit) {
         commit := this._JSONGet(this.commitURL . commit)
-        this.CommitString .= commit.message "`n"
-        for i, file in commit.files {
-            fileDir := file.filename
-            if file.status == "removed" {
+        this.CommitString .= commit["commit"]["message"] "`n"
+        for i, file in commit["files"] {
+            fileDir := file["filename"]
+            if file["status"] == "removed" {
                 this.updatedFiles[fileDir] := "Remove"
             } else {
                 this.updatedFiles[fileDir] := "Update"
             }
         }
-        if commit.parents.sha != this.currentCommit {
-            this._CheckCommit(commit.parents.sha)
+        for _, newCommit in commit["parents"] {
+            if newCommit["sha"] == this.currentCommit {
+                return
+            }
+        }
+        for _, newCommit in commit["parents"] {
+            this._CheckCommit(newCommit["sha"])
         }
     }
 
@@ -55,10 +64,13 @@ class AutoUpdater {
         commits := this._JSONGet(this.commitsURL)
 
         latestCommit := commits[1]
-        latestCommitID := latestCommit.sha
+        latestCommitID := latestCommit["sha"]
 
-        this.latestCommit := latestCommit
-        this.currentCommit := this.currentCommit ? this.currentCommit : latestCommit
+        this.latestCommitID := latestCommitID
+        if not this.currentCommit {
+            this.currentCommit := latestCommitID
+            FileAppend latestCommitID, this.savePath
+        }
         
         if latestCommitID != this.currentCommit {
             this.newVersion := true
@@ -76,9 +88,10 @@ class AutoUpdater {
             if cmd == "Remove" {
                 DirDelete fileDir
             } else {
-                Download this.fileURL . fileDir, "*" . fileDir
+                Download(this.fileURL . fileDir, fileDir)
             }
         }
-        FileAppend this.latestCommit, this.savePath
+        versionFile := FileOpen(this.savePath, "w")
+        versionFile.Write(this.latestCommitID)
     }
 }
