@@ -7,13 +7,13 @@ class AutoUpdater {
 
     __New(owner, repo, tree:="main", savePath:="version") {
         this.APIRepoURL := github "/" owner "/" repo
-        this.commitsURL := this.APIRepoURL "/commits?per_page=10?sha=" tree
+        this.commitsURL := this.APIRepoURL "/commits?per_page=10&sha=" tree
         this.commitURL := this.APIRepoURL "/commits/"
         this.fileURL := "https://raw.githubusercontent.com/" owner "/" repo "/" tree "/"
         this.updatedFiles := Map()
         this.savePath := savePath ".txt"
         this.CommitString := ""
-        this.currentCommit := ""
+        this.currentCommit := false
 
         this._GetCommitVersion()
         this._CheckForCommitUpdates()
@@ -69,7 +69,7 @@ class AutoUpdater {
         this.latestCommitID := latestCommitID
         if not this.currentCommit {
             this.currentCommit := latestCommitID
-            FileAppend latestCommitID, this.savePath
+            FileAppend(latestCommitID, this.savePath)
         }
         
         if latestCommitID != this.currentCommit {
@@ -86,12 +86,15 @@ class AutoUpdater {
     UpdateFiles() {
         for fileDir, cmd in this.updatedFiles {
             if cmd == "Remove" {
-                DirDelete fileDir
+                if FileExist(fileDir) {
+                    DirDelete fileDir
+                }
             } else {
                 Download(this.fileURL . fileDir, fileDir)
             }
         }
-        versionFile := FileOpen(this.savePath, "w")
+        versionFile := FileOpen(this.savePath, "w-d")
         versionFile.Write(this.latestCommitID)
+        versionFile.Close()
     }
 }
